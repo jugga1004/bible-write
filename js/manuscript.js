@@ -98,25 +98,44 @@
 
   // ------------------------------------------------------------- 백업
 
-  /** 원고 전체 + 설정/진도. 본문은 넣지 않는다(저작권물이고, 다시 들여오면 된다). */
-  MS.exportAll = function () {
+  /**
+   * 원고 + 설정/진도, 그리고 본문(원하면).
+   *
+   * 본문을 함께 담는 건 **기기를 옮기기 위해서**다. 브라우저 저장소는 그 브라우저
+   * 안에만 있어서, 컴퓨터에서 들여온 본문이 폰에는 없다. 파일 하나로 옮기면
+   * 계정도 서버도 필요 없다 — 본문이 남의 서버에 복제되지 않는다는 점이 더 중요하다.
+   *
+   * 다만 이 파일에는 저작권이 있는 번역본이 들어간다. 본인 기기 사이에서 옮기는
+   * 용도이고, 남에게 나눠 주는 용도가 아니다.
+   */
+  MS.exportAll = function (includeBible) {
     return DB.range("manuscripts", "0", "zzz").then(function (recs) {
-      return {
+      var out = {
         app: "bible-write",
         v: 1,
         at: new Date().toISOString(),
         store: ST.dump(),
         manuscripts: recs
       };
+      if (!includeBible) return out;
+      return DB.range("verses", "0", "zzz").then(function (vs) {
+        out.verses = vs;
+        return out;
+      });
     });
   };
 
   MS.importAll = function (obj) {
     if (!obj || obj.app !== "bible-write") return Promise.reject(new Error("이 앱의 백업 파일이 아닙니다."));
     ST.restore(obj.store);
-    return DB.putAll("manuscripts", obj.manuscripts || []).then(function () {
-      return (obj.manuscripts || []).length;
-    });
+    return DB.putAll("manuscripts", obj.manuscripts || [])
+      .then(function () { return DB.putAll("verses", obj.verses || []); })
+      .then(function () {
+        return {
+          chapters: (obj.manuscripts || []).length,
+          bible: (obj.verses || []).length
+        };
+      });
   };
 
   /** IndexedDB를 훑어 진도표를 다시 만든다. 진도가 어긋나 보일 때의 복구 수단. */

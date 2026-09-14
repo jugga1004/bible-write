@@ -185,11 +185,15 @@
     <div class="card">
       <h2>백업</h2>
       <p class="muted">브라우저 저장소는 사용 기록을 지우면 함께 사라집니다. 가끔 내려받아 두세요.</p>
+      <label class="check"><input type="checkbox" id="backupWithBible" checked> 본문도 함께 담기</label>
       <div class="row">
         <button type="button" id="backupBtn" class="btn btn--primary">백업 내려받기</button>
         <button type="button" id="restoreBtn" class="btn">백업 불러오기</button>
         <input type="file" id="restoreFile" accept="application/json,.json" hidden>
       </div>
+      <p class="muted">본문까지 담으면 이 파일 하나로 <b>다른 기기에서 그대로 이어서 쓸 수 있습니다</b>
+        — 폰으로 파일을 보낸 뒤 그 기기에서 `백업 불러오기`를 하면 됩니다. 계정도 서버도 필요 없습니다.
+        대신 파일에 번역본 본문이 들어가니 본인 기기 사이에서만 옮기세요.</p>
       <p class="muted" id="storageInfo"></p>
     </div>
 

@@ -576,9 +576,12 @@
   });
 
   $("backupBtn").addEventListener("click", function () {
-    MS.exportAll().then(function (data) {
-      SRC.download("성경쓰기-백업-" + ST.today() + ".json", JSON.stringify(data), "application/json");
-      toast("백업 파일을 내려받았습니다.");
+    var withBible = $("backupWithBible").checked;
+    MS.exportAll(withBible).then(function (data) {
+      var json = JSON.stringify(data);
+      SRC.download("성경쓰기-백업-" + ST.today() + ".json", json, "application/json");
+      toast("백업 파일을 내려받았습니다 (" + (json.length / 1048576).toFixed(1) + "MB" +
+        (withBible ? ", 본문 포함" : "") + ").");
     });
   });
 
@@ -592,9 +595,11 @@
       try { obj = JSON.parse(reader.result); }
       catch (e) { toast("읽을 수 없는 파일입니다."); return; }
       MS.importAll(obj).then(function (n) {
-        toast(n + "개 장의 원고를 되살렸습니다.");
+        toast("원고 " + n.chapters + "장" + (n.bible ? ", 본문 " + n.bible + "장" : "") + "을 되살렸습니다.");
         applySettings();
+        renderSources();
         renderToday();
+        state.book = null;   // 열려 있던 장은 백업 쪽 내용으로 바뀌었을 수 있다
       }, function (err) { toast(err.message); });
     };
     reader.readAsText(f);
