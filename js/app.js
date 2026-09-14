@@ -113,8 +113,10 @@
       grid.appendChild(box);
     });
 
-    // 막대는 최근 것만 보여준다. 전체를 고르면 날이 수백 개라 한 칸이 1px가 된다.
-    var bars = statRange ? rows : rows.slice(-30);
+    // 하루만 보는데 막대가 하나면 견줄 대상이 없어 아무 말도 못 한다. 그때는
+    // 막대를 감추는 대신 최근 흐름(7일)을 그려 오늘이 어디쯤인지 보이게 한다.
+    // 전체를 고르면 날이 수백 개라 한 칸이 1px가 되므로 최근 30일만 그린다.
+    var bars = statRange === 1 ? ST.recentDays(7) : (statRange ? rows : rows.slice(-30));
     var max = 1;
     bars.forEach(function (r) { if (r.verses > max) max = r.verses; });
     var today = ST.today();
@@ -135,9 +137,15 @@
     if (t.days) note.push("쓴 날 " + t.days + "일");
     if (t.jamo) note.push("총 " + t.jamo.toLocaleString("ko-KR") + "타");
     if (t.err) note.push("오타 " + t.err.toLocaleString("ko-KR") + "번");
-    $("statsNote").textContent = t.verses
-      ? note.join(" · ") + " (막대는 하루에 쓴 절 수, 초록은 오늘)"
-      : "아직 기록이 없습니다. 한 절만 써도 여기에 남습니다.";
+    if (statRange === 1) {
+      $("statsNote").textContent = t.verses
+        ? "오늘 기록입니다 (막대는 최근 7일, 초록이 오늘)"
+        : "오늘은 아직 안 썼습니다 (막대는 최근 7일)";
+    } else {
+      $("statsNote").textContent = t.verses
+        ? note.join(" · ") + " (막대는 하루에 쓴 절 수, 초록은 오늘)"
+        : "아직 기록이 없습니다. 한 절만 써도 여기에 남습니다.";
+    }
 
     renderDayList(rows);
   }
