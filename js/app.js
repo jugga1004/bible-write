@@ -138,6 +138,52 @@
     $("statsNote").textContent = t.verses
       ? note.join(" · ") + " (막대는 하루에 쓴 절 수, 초록은 오늘)"
       : "아직 기록이 없습니다. 한 절만 써도 여기에 남습니다.";
+
+    renderDayList(rows);
+  }
+
+  /**
+   * 날짜별 기록.
+   * 안 쓴 날까지 줄줄이 늘어놓으면 눈에 안 들어와서 쓴 날만 적되,
+   * **오늘은 아직 안 썼어도 맨 위에 둔다** — 오늘 몫이 보여야 오늘 쓰게 된다.
+   */
+  function renderDayList(rows) {
+    var box = $("dayList");
+    box.innerHTML = "";
+    var today = ST.today();
+
+    var list = rows.filter(function (r) { return r.verses > 0; });
+    list.reverse();                                    // 최근 날짜부터
+    if (!list.length || list[0].date !== today) {
+      list.unshift(ST.recentDays(1)[0]);               // 오늘 줄은 늘 맨 위에
+    }
+
+    var shown = list.slice(0, 30);
+    shown.forEach(function (r) {
+      var isToday = r.date === today;
+      var row = el("div", "dayrow" + (isToday ? " dayrow--today" : ""));
+
+      var d = r.date.split("-");
+      row.appendChild(el("div", "dayrow__date",
+        (isToday ? "오늘 " : "") + Number(d[1]) + "/" + Number(d[2])));
+
+      row.appendChild(el("div", "dayrow__main", r.verses ? r.verses + "절" : "—"));
+
+      var bits = [];
+      if (r.ms) {
+        var cpm = Math.round(r.jamo / (r.ms / 60000));
+        if (cpm) bits.push(cpm + "타/분");
+      }
+      if (r.jamo) bits.push("정확도 " + ((1 - r.err / r.jamo) * 100).toFixed(1) + "%");
+      if (r.ms) bits.push(Math.max(1, Math.round(r.ms / 60000)) + "분");
+      row.appendChild(el("div", "dayrow__rest", bits.length ? bits.join(" · ") : "아직 안 썼습니다"));
+
+      box.appendChild(row);
+    });
+
+    if (list.length > shown.length) {
+      box.appendChild(el("div", "daylist__more", "그 밖에 " + (list.length - shown.length) + "일 더 있습니다"));
+    }
   }
 
   function renderRecent() {

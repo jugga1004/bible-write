@@ -311,6 +311,20 @@ textarea { resize: vertical; line-height: 1.6; }
 .days__bar.is-empty { background: var(--border); }
 .days__bar.is-today { background: var(--ok); }
 
+/* 날짜별 기록 — 하루 한 줄 */
+.daylist { margin-top: 12px; border-top: 1px solid var(--border); }
+.dayrow {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 7px 2px; border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.dayrow--today { background: var(--primary-soft); border-radius: 8px; padding-left: 8px; padding-right: 8px; }
+.dayrow__date { min-width: 74px; color: var(--muted); }
+.dayrow--today .dayrow__date { color: var(--primary); font-weight: 600; }
+.dayrow__main { font-weight: 600; min-width: 52px; }
+.dayrow__rest { margin-left: auto; color: var(--muted); text-align: right; }
+.daylist__more { padding: 8px 2px; color: var(--muted); font-size: 0.82rem; text-align: center; }
+
 .recent { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .recent button {
   display: flex; gap: 8px; width: 100%; padding: 8px 10px;
