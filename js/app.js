@@ -75,7 +75,69 @@
       ? BK.label(next.book, next.ch, next.v) + "부터"
       : (has ? "가진 본문을 모두 필사했습니다." : "");
 
+    renderStats();
     renderRecent();
+  }
+
+  // ------------------------------------------------------------- 기록
+
+  var statRange = 7;
+
+  $("statRange").addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest(".seg__btn") : null;
+    if (!b) return;
+    statRange = parseInt(b.getAttribute("data-r"), 10);
+    var all = $("statRange").querySelectorAll(".seg__btn");
+    for (var i = 0; i < all.length; i++) all[i].className = "seg__btn" + (all[i] === b ? " is-on" : "");
+    renderStats();
+  });
+
+  function renderStats() {
+    var rows = statRange ? ST.recentDays(statRange) : ST.allDays();
+    var t = ST.summarize(rows);
+
+    var cells = [
+      { num: t.verses.toLocaleString("ko-KR"), unit: "절", label: "쓴 절" },
+      { num: t.cpm ? t.cpm.toLocaleString("ko-KR") : "—", unit: "타/분", label: "평균 타속" },
+      { num: t.accuracy == null ? "—" : (t.accuracy * 100).toFixed(1), unit: "%", label: "정확도" },
+      { num: Math.round(t.ms / 60000).toLocaleString("ko-KR"), unit: "분", label: "쓴 시간" }
+    ];
+    var grid = $("statGrid");
+    grid.innerHTML = "";
+    cells.forEach(function (c) {
+      var box = el("div", "statcell");
+      var num = el("div", "statcell__num", c.num);
+      num.appendChild(el("span", "statcell__unit", c.unit));
+      box.appendChild(num);
+      box.appendChild(el("div", "statcell__label", c.label));
+      grid.appendChild(box);
+    });
+
+    // 막대는 최근 것만 보여준다. 전체를 고르면 날이 수백 개라 한 칸이 1px가 된다.
+    var bars = statRange ? rows : rows.slice(-30);
+    var max = 1;
+    bars.forEach(function (r) { if (r.verses > max) max = r.verses; });
+    var today = ST.today();
+
+    var chart = $("daysChart");
+    chart.innerHTML = "";
+    bars.forEach(function (r) {
+      var col = el("div", "days__col");
+      var bar = el("div", "days__bar" + (r.verses ? (r.date === today ? " is-today" : "") : " is-empty"));
+      bar.style.height = (r.verses ? Math.max(6, r.verses / max * 100) : 2) + "%";
+      var acc = r.jamo ? " · 정확도 " + ((1 - r.err / r.jamo) * 100).toFixed(0) + "%" : "";
+      bar.title = r.date + " · " + r.verses + "절" + (r.ms ? " · " + Math.round(r.ms / 60000) + "분" : "") + acc;
+      col.appendChild(bar);
+      chart.appendChild(col);
+    });
+
+    var note = [];
+    if (t.days) note.push("쓴 날 " + t.days + "일");
+    if (t.jamo) note.push("총 " + t.jamo.toLocaleString("ko-KR") + "타");
+    if (t.err) note.push("오타 " + t.err.toLocaleString("ko-KR") + "번");
+    $("statsNote").textContent = t.verses
+      ? note.join(" · ") + " (막대는 하루에 쓴 절 수, 초록은 오늘)"
+      : "아직 기록이 없습니다. 한 절만 써도 여기에 남습니다.";
   }
 
   function renderRecent() {

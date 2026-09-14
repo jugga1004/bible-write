@@ -165,13 +165,14 @@
 
   ST.stats = function () { return read(K.stats, { days: {} }) || { days: {} }; };
 
-  ST.addRecord = function (jamo, ms, verses) {
+  ST.addRecord = function (jamo, ms, verses, errors) {
     var s = ST.stats();
     var key = ST.today();
-    var d = s.days[key] || { jamo: 0, ms: 0, verses: 0 };
+    var d = s.days[key] || { jamo: 0, ms: 0, verses: 0, err: 0 };
     d.jamo += jamo || 0;
     d.ms += ms || 0;
     d.verses += verses || 0;
+    d.err = (d.err || 0) + (errors || 0);
     s.days[key] = d;
     prune(s);
     write(K.stats, s);
@@ -203,7 +204,58 @@
   };
 
   ST.todayRecord = function () {
-    return ST.stats().days[ST.today()] || { jamo: 0, ms: 0, verses: 0 };
+    return ST.stats().days[ST.today()] || { jamo: 0, ms: 0, verses: 0, err: 0 };
+  };
+
+  /** 최근 n일을 하루도 빠짐없이(안 쓴 날은 0으로) 오래된 날부터 돌려준다. */
+  ST.recentDays = function (n) {
+    var days = ST.stats().days || {};
+    var out = [];
+    var d = new Date();
+    d.setDate(d.getDate() - (n - 1));
+    for (var i = 0; i < n; i++) {
+      var key = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+      var r = days[key] || {};
+      out.push({
+        date: key,
+        label: (d.getMonth() + 1) + "/" + d.getDate(),
+        jamo: r.jamo || 0, ms: r.ms || 0, verses: r.verses || 0, err: r.err || 0
+      });
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  };
+
+  /**
+   * 여러 날치를 하나로 합친 기록.
+   *
+   * 타속은 날마다 낸 타속을 평균내지 않는다 — 한 절만 쓴 날과 백 절 쓴 날이
+   * 같은 무게가 되어 실제와 멀어진다. 전체 자모를 전체 시간으로 나눈다.
+   * 정확도도 같은 이유로 전체 오타를 전체 자모로 나눈다.
+   */
+  ST.summarize = function (rows) {
+    var t = { jamo: 0, ms: 0, verses: 0, err: 0, days: 0 };
+    for (var i = 0; i < rows.length; i++) {
+      t.jamo += rows[i].jamo; t.ms += rows[i].ms;
+      t.verses += rows[i].verses; t.err += rows[i].err;
+      if (rows[i].verses) t.days++;
+    }
+    var min = t.ms / 60000;
+    t.cpm = min > 0.005 ? Math.round(t.jamo / min) : 0;
+    t.accuracy = t.jamo ? Math.max(0, 1 - t.err / t.jamo) : null;
+    return t;
+  };
+
+  /** 기록이 있는 모든 날 (오래된 순) */
+  ST.allDays = function () {
+    var days = ST.stats().days || {};
+    var keys = [];
+    for (var k in days) if (days.hasOwnProperty(k)) keys.push(k);
+    keys.sort();
+    return keys.map(function (k) {
+      var r = days[k];
+      return { date: k, jamo: r.jamo || 0, ms: r.ms || 0, verses: r.verses || 0, err: r.err || 0 };
+    });
   };
 
   // ------------------------------------------------------------- 백업

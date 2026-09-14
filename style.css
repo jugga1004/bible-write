@@ -296,6 +296,21 @@ textarea { resize: vertical; line-height: 1.6; }
   border-radius: 10px; font-size: 0.87rem;
 }
 
+/* 기록 — 숫자 넷을 한 줄에, 좁은 화면에서는 둘씩 */
+.statgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0 14px; }
+@media (max-width: 460px) { .statgrid { grid-template-columns: repeat(2, 1fr); } }
+.statcell { text-align: center; padding: 8px 4px; background: var(--surface-2); border-radius: 10px; }
+.statcell__num { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.statcell__unit { font-size: 0.72rem; font-weight: 400; color: var(--muted); margin-left: 2px; }
+.statcell__label { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+/* 날짜별 막대 — 라이브러리 없이 div 높이로 그린다 */
+.days { display: flex; align-items: flex-end; gap: 3px; height: 72px; margin-bottom: 6px; }
+.days__col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; min-width: 0; }
+.days__bar { background: var(--primary); border-radius: 3px 3px 0 0; min-height: 2px; }
+.days__bar.is-empty { background: var(--border); }
+.days__bar.is-today { background: var(--ok); }
+
 .recent { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .recent button {
   display: flex; gap: 8px; width: 100%; padding: 8px 10px;

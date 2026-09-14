@@ -34,12 +34,16 @@
         rec.updated = Date.now();
         rec.jamo = (rec.jamo || 0) + ((stats && stats.jamo) || 0);
         rec.ms = (rec.ms || 0) + ((stats && stats.ms) || 0);
+        rec.err = (rec.err || 0) + ((stats && stats.errorEvents) || 0);
         rec.doneCount = countKeys(rec.verses);
         return DB.put("manuscripts", rec).then(function () {
           ST.setChapter(code, ch, rec.doneCount, null);
           ST.setPosition(code, ch, v);
           ST.clearDraft();
-          if (isNew) ST.addRecord((stats && stats.jamo) || 0, (stats && stats.ms) || 0, 1);
+          if (isNew) {
+            ST.addRecord((stats && stats.jamo) || 0, (stats && stats.ms) || 0, 1,
+              (stats && stats.errorEvents) || 0);
+          }
           return rec;
         });
       });
