@@ -27,6 +27,7 @@
 
     var prevStates = [];
     var errorEvents = 0;
+    var typedJamo = 0;
     var startedAt = 0, lastInputAt = 0, elapsed = 0;
 
     var session = {};
@@ -68,12 +69,27 @@
 
       // 오타는 "머무는 동안"이 아니라 "틀리게 된 순간"에만 센다.
       // 조합 중(pending)은 절대 오타가 아니다 — IME 때문에 생기는 중간 상태일 뿐이다.
-      for (i = 0; i < states.length; i++) {
+      //
+      // 그리고 **지금 치고 있는 자리는 세지 않는다.** 맨 끝 글자는 조합이 들락거리는
+      // 자리라 한 음절을 치는 동안에도 판정이 여러 번 뒤집힌다. 거기서 세면 정상적으로
+      // 쳐도 오타가 수십 번 쌓인다. 사람 기준으로도 아직 치는 중인 글자는 오타가
+      // 아니라 고쳐 쓰는 중이다. **지나쳐 버린 자리**만 오타로 본다.
+      var settled = tp.length - 1;
+
+      // 아직 치고 있는 자리는 "틀렸다"로 **기억해 두지도** 않는다. 기억해 두면
+      // 나중에 그 자리를 지나칠 때 "이미 틀려 있었다"가 되어 한 번도 세지 못한다.
+      var mark = states.slice();
+      for (i = settled < 0 ? 0 : settled; i < mark.length; i++) {
+        if (mark[i] === "err" || mark[i] === "extra") mark[i] = "pending";
+      }
+
+      for (i = 0; i < settled; i++) {
         var was = prevStates[i];
         var now = states[i];
         if ((now === "err" || now === "extra") && was !== "err" && was !== "extra") errorEvents++;
       }
-      prevStates = states;
+      prevStates = mark;
+      typedJamo = HG.jamoCount(typed.text);
 
       tick(tp.length > 0);
 
@@ -117,21 +133,29 @@
       lastInputAt = now;
     }
 
+    /**
+     * 타속은 **지금까지 친 만큼**을 지금까지 걸린 시간으로 나눈다.
+     * 절 전체 글자 수를 분자에 쓰면, 앞부분만 쳤을 때 실제의 몇 배가 나온다
+     * (절을 다 치고 나면 둘은 같은 값이 된다).
+     */
     session.stats = function () {
       var jamo = HG.jamoCount(target.text);
       var min = elapsed / 60000;
+      var counted = typedJamo || 0;
       return {
-        jamo: jamo,
+        jamo: jamo,                 // 이 절의 분량 (기록에 남길 값)
+        typedJamo: counted,
         ms: elapsed,
-        cpm: min > 0.0005 ? Math.round(jamo / min) : 0,
+        cpm: min > 0.0005 ? Math.round(counted / min) : 0,
         errorEvents: errorEvents,
-        accuracy: jamo > 0 ? Math.max(0, 1 - errorEvents / jamo) : 1
+        accuracy: counted > 0 ? Math.max(0, 1 - errorEvents / counted) : 1
       };
     };
 
     session.reset = function () {
       prevStates = [];
       errorEvents = 0;
+      typedJamo = 0;
       startedAt = 0; lastInputAt = 0; elapsed = 0;
     };
 

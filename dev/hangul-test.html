@@ -135,16 +135,39 @@
   // ---------------------------------------------------------------- 오타 계수
   section("5. 오타 계수 · 타수");
   s = TY.createSession("가나다");
-  s.update("바", 1, 1);        // 오타 확정
-  s.update("바", 1, 1);        // 같은 오타 유지 -> 더 세지 않는다
-  eq(s.stats().errorEvents, 1, "오타는 '틀리게 된 순간'에만 1회");
+  s.update("바", 1, 1);        // 아직 그 자리에 있다 — 고치는 중일 뿐이다
+  eq(s.stats().errorEvents, 0, "치고 있는 자리는 오타로 세지 않는다");
+  s.update("바나", 2, 2);      // 다음 글자로 넘어갔다 = 틀린 채로 지나쳤다
+  eq(s.stats().errorEvents, 1, "지나쳐 버린 자리만 오타 1회");
+  s.update("바나", 2, 2);      // 그대로 유지 -> 더 세지 않는다
+  eq(s.stats().errorEvents, 1, "머무는 동안 중복해서 세지 않는다");
   s.update("", 0, 0);
-  s.update("바", 1, 1);        // 지웠다 다시 틀림 -> 새 오타
+  s.update("바나", 2, 2);      // 지웠다 다시 같은 실수
   eq(s.stats().errorEvents, 2, "지웠다 다시 틀리면 다시 1회");
+
   s = TY.createSession("가나");
   s.update("ㄱ", 0, 1); s.update("가", 0, 1); s.update("간", 0, 1); s.update("가나", 1, 2);
   eq(s.stats().errorEvents, 0, "정상 타이핑에서는 오타 0");
   eq(HG.jamoCount("태초에 하나님이"), 16, "타수 = 자모 수 + 공백");
+
+  // 타속은 '지금까지 친 만큼'으로 낸다. 절 전체를 분자에 쓰면 앞부분만 쳤을 때 몇 배가 나온다.
+  s = TY.createSession("태초에 하나님이 천지를 창조하시니라");
+  s.update("태", 1, 1);
+  var st5 = s.stats();
+  log(st5.typedJamo === 2, "타속 분자는 친 만큼 (typedJamo=" + st5.typedJamo + ", 절 전체=" + st5.jamo + ")");
+
+  section("6. 브라우저가 조합 정보를 안 줄 때도 오타가 쌓이지 않는가");
+  // 안드로이드 일부 키보드나 IME 조합 보고가 어긋나는 환경에서는 "조합 중"이라는
+  // 신호가 아예 오지 않을 수 있다. 그때도 정상 타이핑에서 오타가 쌓이면 안 된다.
+  SENTENCES.forEach(function (sen) {
+    var steps = IME.typeOut(sen);
+    var sess = TY.createSession(sen);
+    steps.forEach(function (st) {
+      sess.update(st.value, st.value.length, st.value.length);  // 조합 구간 = 없음
+    });
+    var e = sess.stats().errorEvents;
+    log(e === 0, sen.slice(0, 12) + "…  조합 정보 없이 쳐도 오타 " + e + "회");
+  });
 
   // ---------------------------------------------------------------- 결과
   var sum = document.getElementById("summary");
