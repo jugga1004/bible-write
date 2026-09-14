@@ -97,6 +97,99 @@
     });
   };
 
+  // ------------------------------------------------------------- 인터넷에서 가져오기
+  //
+  // 붙여넣기는 한 장에 한 번이다. 통독을 하려면 1,189번을 해야 하니 쓸 수 없다.
+  // 그래서 공개된 성경 API에서 한 권씩 받아 온다.
+  //
+  // 앱은 여전히 본문을 담지 않는다 — 받는 주체는 사용자의 브라우저이고, 받은
+  // 본문은 그 기기 안에만 있다. 번역본의 권리는 각 권리자에게 있으며, 이 출처들은
+  // 한국어 본문의 라이선스를 밝히지 않는다. 개인적으로 읽는 용도로만 쓸 것.
+  //
+  // 주소를 바꿔 끼울 수 있게 목록으로 둔다. 한 곳이 닫혀도 앱이 멈추지 않는다.
+
+  SRC.REMOTES = [
+    {
+      id: "getbible-korean",
+      label: "개역한글 · getbible.net",
+      version: "개역한글",
+      url: function (nr) { return "https://api.getbible.net/v2/korean/" + nr + ".json"; },
+      parse: function (data) {
+        var chapters = {};
+        (data.chapters || []).forEach(function (ch) {
+          var arr = [];
+          (ch.verses || []).forEach(function (v) {
+            arr[v.verse - 1] = NM.normalizeSource(v.text || "");
+          });
+          for (var i = 0; i < arr.length; i++) if (arr[i] == null) arr[i] = "";
+          chapters[ch.chapter] = arr;
+        });
+        return chapters;
+      }
+    },
+    {
+      id: "bolls-krv",
+      label: "개역한글 · bolls.life",
+      version: "개역한글",
+      url: function (nr) { return "https://bolls.life/get-text/KRV/" + nr + "/"; },
+      // bolls는 장 단위 주소라 한 권을 받으려면 장마다 불러야 한다. 여기서는
+      // 예비 출처로만 두고, 장 단위 보충에 쓴다.
+      chapterUrl: function (nr, ch) { return "https://bolls.life/get-text/KRV/" + nr + "/" + ch + "/"; },
+      parseChapter: function (rows) {
+        var arr = [];
+        (rows || []).forEach(function (v) { arr[v.verse - 1] = NM.normalizeSource(v.text || ""); });
+        for (var i = 0; i < arr.length; i++) if (arr[i] == null) arr[i] = "";
+        return arr;
+      }
+    }
+  ];
+
+  SRC.remote = function (id) {
+    for (var i = 0; i < SRC.REMOTES.length; i++) if (SRC.REMOTES[i].id === id) return SRC.REMOTES[i];
+    return SRC.REMOTES[0];
+  };
+
+  /** 한 권을 받아 저장한다. 이미 있으면 건드리지 않는다(force면 덮어쓴다). */
+  SRC.fetchBook = function (code, remoteId, force) {
+    var b = BK.byCode(code);
+    if (!b) return Promise.reject(new Error("모르는 책입니다: " + code));
+    if (!force && ST.sources()[code]) return Promise.resolve(0);
+
+    var r = SRC.remote(remoteId);
+    if (!r.parse) return Promise.reject(new Error(r.label + "은 권 단위로 받을 수 없습니다."));
+
+    return fetch(r.url(b.i + 1), { cache: "no-store" }).then(function (res) {
+      if (!res.ok) throw new Error("받지 못했습니다 (HTTP " + res.status + ")");
+      return res.json();
+    }).then(function (data) {
+      var chapters = r.parse(data);
+      var got = 0;
+      for (var k in chapters) if (chapters.hasOwnProperty(k)) got++;
+      if (!got) throw new Error("본문이 비어 있습니다.");
+      return BX.putChapters(code, chapters, r.version).then(function () { return got; });
+    });
+  };
+
+  /**
+   * 여러 권을 차례로 받는다. 한 권이 실패해도 멈추지 않고 끝까지 간 뒤 알려 준다 —
+   * 66권 받다가 40번째에서 끊기면 다시 처음부터 받아야 하는 게 더 나쁘다.
+   */
+  SRC.fetchBooks = function (codes, remoteId, onProgress, force) {
+    var done = 0, failed = [];
+    var chain = Promise.resolve();
+    codes.forEach(function (code, i) {
+      chain = chain.then(function () {
+        if (onProgress) onProgress(i, codes.length, BK.byCode(code).k);
+        return SRC.fetchBook(code, remoteId, force).then(function (n) {
+          if (n) done++;
+        }, function (err) {
+          failed.push(BK.byCode(code).k + " (" + (err && err.message ? err.message : err) + ")");
+        });
+      });
+    });
+    return chain.then(function () { return { done: done, failed: failed }; });
+  };
+
   // ------------------------------------------------------------- 내보내기
 
   /** 저장소의 한 권을 data/bible/GEN.js 형식의 글로 만든다. */

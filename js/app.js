@@ -346,6 +346,84 @@
     });
   })();
 
+  // ------------------------------------------------------------- 인터넷에서 받기
+
+  (function fillNetControls() {
+    var sel = $("netSource");
+    SRC.REMOTES.forEach(function (r) {
+      if (!r.parse) return;          // 권 단위로 못 받는 출처는 목록에 올리지 않는다
+      var o = el("option", null, r.label);
+      o.value = r.id;
+      sel.appendChild(o);
+    });
+    var books = $("netBook");
+    BK.BOOKS.forEach(function (b) {
+      var o = el("option", null, b.k);
+      o.value = b.c;
+      books.appendChild(o);
+    });
+  })();
+
+  $("netScope").addEventListener("change", function () {
+    $("netBookWrap").hidden = this.value !== "one";
+  });
+
+  var netStop = false;
+
+  $("netStop").addEventListener("click", function () { netStop = true; $("netStatus").textContent = "멈추는 중…"; });
+
+  $("netFetch").addEventListener("click", function () {
+    var scope = $("netScope").value;
+    var remoteId = $("netSource").value;
+    var codes;
+    if (scope === "one") codes = [$("netBook").value];
+    else codes = BK.BOOKS.filter(function (b) { return scope === "all" || b.t === scope; })
+      .map(function (b) { return b.c; });
+
+    // 이미 가진 책은 건너뛴다. 66권을 다시 받느라 기다릴 이유가 없다.
+    var have = ST.sources();
+    var todo = codes.filter(function (c) { return !have[c]; });
+    if (!todo.length) {
+      toast(codes.length === 1 ? "이미 가지고 있는 책입니다." : "고르신 범위는 이미 다 받았습니다.");
+      return;
+    }
+
+    netStop = false;
+    setNetBusy(true);
+    $("netBar").style.width = "0%";
+
+    SRC.fetchBooks(todo, remoteId, function (i, total, name) {
+      if (netStop) throw new Error("멈춤");
+      $("netStatus").textContent = name + " 받는 중… (" + (i + 1) + " / " + total + ")";
+      $("netBar").style.width = (i / total * 100) + "%";
+    }).then(function (r) {
+      setNetBusy(false);
+      $("netBar").style.width = "100%";
+      var msg = r.done + "권을 받았습니다.";
+      if (r.failed.length) msg += " 실패 " + r.failed.length + "권: " + r.failed.slice(0, 3).join(", ");
+      $("netStatus").textContent = msg;
+      toast(msg);
+      renderSources();
+      renderToday();
+    }, function (err) {
+      setNetBusy(false);
+      $("netStatus").textContent = netStop ? "멈췄습니다. 받은 곳까지는 저장돼 있습니다."
+        : "받지 못했습니다: " + (err && err.message ? err.message : err) +
+          " (인터넷 연결이나 출처 상태를 확인해 주세요)";
+      renderSources();
+      renderToday();
+    });
+  });
+
+  function setNetBusy(busy) {
+    $("netFetch").disabled = busy;
+    $("netStop").hidden = !busy;
+    $("netBarWrap").hidden = !busy;
+    if (busy) $("netStatus").textContent = "시작합니다…";
+  }
+
+  // ------------------------------------------------------------- 붙여넣어 가져오기
+
   var parsed = null;   // 미리보기에서 사람이 고친 결과가 진짜다
 
   function runParse() {
