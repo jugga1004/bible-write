@@ -71,17 +71,26 @@
     });
   };
 
-  /** 시작할 때 한 번: 파일로 들어 있는 본문 중 아직 저장소에 없는 걸 채운다. */
+  /**
+   * 시작할 때 한 번: 파일로 들어 있는 본문 중 저장소에 없는 걸 채운다.
+   *
+   * "이미 가져왔나"를 ST.sources()(localStorage)로 판단하면 안 된다.
+   * file:// 로 열면 IndexedDB가 막혀 본문이 **메모리에만** 살아 있다가 창을 닫으면
+   * 사라지는데, 출처·진도 기록은 localStorage라 그대로 남는다. 그러면 다음에 열 때
+   * "이미 있다"고 착각해 파일을 읽지 않고, 본문 없는 앱이 된다.
+   * 그래서 기록이 아니라 **실제로 본문이 있는지**를 확인한다.
+   */
   SRC.syncFromFiles = function () {
     return SRC.loadIndex().then(function (index) {
       if (!index || !index.length) return 0;
-      var have = ST.sources();
-      var todo = index.filter(function (b) { return !have[b.c]; });
       var n = 0;
       var chain = Promise.resolve();
-      todo.forEach(function (b) {
+      index.forEach(function (b) {
         chain = chain.then(function () {
-          return SRC.importBook(b.c).then(function (cnt) { n += cnt ? 1 : 0; });
+          return BX.getChapter(b.c, 1).then(function (rec) {
+            if (rec && rec.verses && rec.verses.length) return null;
+            return SRC.importBook(b.c, true).then(function (cnt) { if (cnt) n++; });
+          });
         });
       });
       return chain.then(function () { return n; });
