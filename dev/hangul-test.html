@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자모·판정 엔진 시험</title>
+<style>
+  body { font-family: "Malgun Gothic", sans-serif; max-width: 900px; margin: 0 auto; padding: 16px; }
+  h2 { font-size: 1rem; margin-top: 24px; }
+  .pass { color: #0a7c3d; }
+  .fail { color: #c62828; font-weight: 700; }
+  pre { background: #f4f4f6; padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 12px; }
+  #summary { padding: 12px; border-radius: 8px; font-weight: 700; }
+  .ok { background: #e6f4ea; color: #0a7c3d; }
+  .bad { background: #fdecea; color: #c62828; }
+  table { border-collapse: collapse; font-size: 12px; }
+  td, th { border: 1px solid #ddd; padding: 3px 6px; }
+</style>
+</head>
+<body>
+<h1>자모·판정 엔진 시험</h1>
+<div id="summary">실행 중…</div>
+<div id="out"></div>
+
+<script src="../js/hangul.js"></script>
+<script src="../js/normalize.js"></script>
+<script src="../js/typing.js"></script>
+<script src="ime.js"></script>
+<script>
+(function () {
+  var out = document.getElementById("out");
+  var pass = 0, fail = 0;
+
+  function section(t) { var h = document.createElement("h2"); h.textContent = t; out.appendChild(h); }
+  function log(okFlag, msg) {
+    var p = document.createElement("div");
+    p.className = okFlag ? "pass" : "fail";
+    p.textContent = (okFlag ? "PASS  " : "FAIL  ") + msg;
+    out.appendChild(p);
+    okFlag ? pass++ : fail++;
+  }
+  function eq(a, b, msg) { log(a === b, msg + "  (got: " + a + " / want: " + b + ")"); }
+
+  // ---------------------------------------------------------------- 자모 분해
+  section("1. 자모 분해");
+  eq(HG.seqOf("한").join(""), "ㅎㅏㄴ", "한");
+  eq(HG.seqOf("값").join(""), "ㄱㅏㅂㅅ", "값 — 겹받침");
+  eq(HG.seqOf("화").join(""), "ㅎㅗㅏ", "화 — 겹모음");
+  eq(HG.seqOf("의").join(""), "ㅇㅡㅣ", "의");
+  eq(HG.seqOf("읽").join(""), "ㅇㅣㄹㄱ", "읽");
+  eq(HG.seqOf("왜").join(""), "ㅇㅗㅐ", "왜 — ㅙ는 ㅗ+ㅐ까지만");
+  eq(HG.seqOf("ㅎ").join(""), "ㅎ", "낱자 ㅎ(호환 자모)");
+  eq(HG.seqOf("가 나").join(""), "ㄱㅏ ㄴㅏ", "공백은 한 칸 그대로");
+
+  // 모든 음절 왕복
+  var bad = 0;
+  for (var c = 0xac00; c <= 0xd7a3; c++) {
+    var ch = String.fromCharCode(c), d = HG.decompose(ch);
+    if (HG.compose(d[0], d[1], d[2]) !== ch) bad++;
+  }
+  log(bad === 0, "11,172 음절 분해→조합 왕복 (어긋난 개수: " + bad + ")");
+
+  // 모든 음절이 자기 자신의 접두사 상태를 거치는가
+  bad = 0;
+  var examples = [];
+  for (c = 0xac00; c <= 0xd7a3; c += 1) {
+    ch = String.fromCharCode(c);
+    d = HG.decompose(ch);
+    var mid = HG.compose(d[0], d[1], "");        // 받침 떼기 전 상태
+    if (!HG.isJamoPrefix(mid, ch)) { if (examples.length < 5) examples.push(ch); bad++; }
+    if (!HG.isJamoPrefix(d[0], ch)) { if (examples.length < 5) examples.push(ch + "(초성)"); bad++; }
+  }
+  log(bad === 0, "모든 음절이 '초성만' / '받침 없는 상태'를 접두사로 가짐 (어긋남: " + bad + " " + examples.join(",") + ")");
+
+  log(!HG.isJamoPrefix("항", "한"), "항은 한의 접두사가 아니다");
+  log(!HG.isJamoPrefix("바", "한"), "바는 한의 접두사가 아니다");
+
+  // ---------------------------------------------------------------- 정규화
+  section("2. 정규화");
+  eq(NM.normalize("\u201C사랑\u201D").text, '"사랑"', "둥근따옴표 -> 직선");
+  eq(NM.normalize("가  나").text, "가 나", "연속 공백 접기");
+  eq(NM.normalize("가 ").text, "가", "끝 공백 제거");
+  eq(NM.normalize("\uFEFF가").text, "가", "제로폭 제거");
+  var n = NM.normalize("가  나");
+  eq(String(n.owner), "0,1,1,2", "owner: 접힌 공백은 앞 글자에 붙는다");
+  eq(String(n.map), "0,1,3", "map: 정규화 글자의 원본 위치");
+  eq(NM.normalizeSource("태초에...  하나님\u00A0이"), "태초에\u2026 하나님 이", "본문 정리");
+
+  // ---------------------------------------------------------------- 판정 엔진
+  section("3. 판정 — 받침 넘김");
+  var s = TY.createSession("가나");
+  var r = s.update("간", 0, 1);          // ㄱㅏㄴ 을 친 순간, "간"이 조합 중
+  eq(r.states[0], "pending", "'가나'를 칠 때 조합 중인 '간'은 보류");
+  r = s.update("가나", 1, 2);
+  eq(r.states[1], "pending", "'나' 조합 중");
+  log(r.done === true, "글자가 다 맞으면 조합 중이어도 완료");
+
+  s = TY.createSession("한");
+  eq(s.update("하", 0, 1).states[0], "pending", "조합 중 '하'는 보류");
+  eq(s.update("하", 1, 1).states[0], "err", "조합이 끝난 '하'는 오타");
+  eq(s.update("바", 0, 1).states[0], "err", "조합 중이라도 초성이 다르면 즉시 오타");
+
+  // ---------------------------------------------------------------- 통문장
+  section("4. 통문장 — 한 타씩 끝까지");
+  var SENTENCES = [
+    "태초에 하나님이 천지를 창조하시니라",
+    "여호와는 나의 목자시니 내게 부족함이 없으리로다",
+    "값없이 의롭다 하심을 얻은 자 되었느니라",
+    "\u201C빛이 있으라\u201D 하시니 빛이 있었고",
+    "그가 찔림은 우리의 허물을 인함이요"
+  ];
+  SENTENCES.forEach(function (sen) {
+    var steps = IME.typeOut(sen);
+    var sess = TY.createSession(sen);
+    var firstBad = null, res;
+    steps.forEach(function (st, i) {
+      res = sess.update(st.value, st.compStart, st.compEnd);
+      for (var k = 0; k < res.states.length; k++) {
+        if ((res.states[k] === "err" || res.states[k] === "extra") && firstBad === null) {
+          firstBad = { i: i, key: st.key, value: st.value, at: k, state: res.states[k] };
+        }
+      }
+    });
+    var ok = firstBad === null && res && res.done;
+    log(ok, sen.slice(0, 14) + "…  (" + steps.length + "타, 오타표시 " +
+      (firstBad ? "발생: " + firstBad.i + "번째 타 '" + firstBad.key + "' -> \"" + firstBad.value + "\" " + firstBad.at + "번 글자" : "없음") +
+      ", 완료 " + (res && res.done ? "O" : "X") + ")");
+    if (!ok) {
+      var pre = document.createElement("pre");
+      pre.textContent = steps.map(function (x, i) { return i + " " + x.key + " -> [" + x.value + "] " + x.compStart + "~" + x.compEnd; }).join("\n");
+      out.appendChild(pre);
+    }
+  });
+
+  // ---------------------------------------------------------------- 오타 계수
+  section("5. 오타 계수 · 타수");
+  s = TY.createSession("가나다");
+  s.update("바", 1, 1);        // 오타 확정
+  s.update("바", 1, 1);        // 같은 오타 유지 -> 더 세지 않는다
+  eq(s.stats().errorEvents, 1, "오타는 '틀리게 된 순간'에만 1회");
+  s.update("", 0, 0);
+  s.update("바", 1, 1);        // 지웠다 다시 틀림 -> 새 오타
+  eq(s.stats().errorEvents, 2, "지웠다 다시 틀리면 다시 1회");
+  s = TY.createSession("가나");
+  s.update("ㄱ", 0, 1); s.update("가", 0, 1); s.update("간", 0, 1); s.update("가나", 1, 2);
+  eq(s.stats().errorEvents, 0, "정상 타이핑에서는 오타 0");
+  eq(HG.jamoCount("태초에 하나님이"), 16, "타수 = 자모 수 + 공백");
+
+  // ---------------------------------------------------------------- 결과
+  var sum = document.getElementById("summary");
+  sum.className = fail === 0 ? "ok" : "bad";
+  sum.textContent = fail === 0 ? ("전부 통과 — " + pass + "건") : (fail + "건 실패 / " + pass + "건 통과");
+})();
+</script>
+</body>
+</html>

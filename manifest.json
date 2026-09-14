@@ -1,0 +1,15 @@
+{
+  "name": "성경쓰기",
+  "short_name": "성경쓰기",
+  "description": "성경을 타이핑으로 필사하며 통독하는 도구",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f7f8",
+  "theme_color": "#4a5d7e",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

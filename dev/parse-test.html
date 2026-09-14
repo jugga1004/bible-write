@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>붙여넣기 파서 시험</title>
+<style>
+  body { font-family: "Malgun Gothic", sans-serif; max-width: 960px; margin: 0 auto; padding: 16px; }
+  h2 { font-size: 1rem; margin-top: 22px; }
+  .pass { color: #0a7c3d; }
+  .fail { color: #c62828; font-weight: 700; }
+  pre { background: #f4f4f6; padding: 8px; border-radius: 8px; font-size: 12px; white-space: pre-wrap; }
+  #summary { padding: 12px; border-radius: 8px; font-weight: 700; }
+  .ok { background: #e6f4ea; color: #0a7c3d; }
+  .bad { background: #fdecea; color: #c62828; }
+</style>
+</head>
+<body>
+<h1>붙여넣기 파서 시험</h1>
+<p style="color:#666;font-size:13px">
+  본문은 저작권이 있으므로 시험 표본에는 실제 성경 구절을 쓰지 않는다. 파서가 보는 건
+  내용이 아니라 <b>형태</b>(절 번호·줄바꿈·종결어미)이므로, 성경과 같은 꼴로 지어낸 문장이면 충분하다.
+</p>
+<div id="summary">실행 중…</div>
+<div id="out"></div>
+
+<script src="../js/hangul.js"></script>
+<script src="../js/normalize.js"></script>
+<script src="../js/books.js"></script>
+<script src="../js/parse.js"></script>
+<script>
+(function () {
+  var out = document.getElementById("out");
+  var pass = 0, fail = 0;
+
+  function section(t) { var h = document.createElement("h2"); h.textContent = t; out.appendChild(h); }
+  function log(ok, msg) {
+    var p = document.createElement("div");
+    p.className = ok ? "pass" : "fail";
+    p.textContent = (ok ? "PASS  " : "FAIL  ") + msg;
+    out.appendChild(p);
+    ok ? pass++ : fail++;
+  }
+  function show(obj) { var p = document.createElement("pre"); p.textContent = obj; out.appendChild(p); }
+
+  function check(name, raw, want) {
+    section(name);
+    var r = PS.parse(raw, want.hint || {});
+    var vs = r.chapters[0] ? r.chapters[0].verses : [];
+    log(r.strategy === want.strategy, "쪼개기 방식 = " + r.strategy + " (기대 " + want.strategy + ")");
+    log(vs.length === want.count, "절 개수 = " + vs.length + " (기대 " + want.count + ")");
+    if (want.first) log(vs[0] && vs[0].t === want.first, "1절 본문 = " + (vs[0] ? vs[0].t : "(없음)"));
+    if (want.last) log(vs.length && vs[vs.length - 1].t === want.last, "마지막 절 본문 = " + (vs.length ? vs[vs.length - 1].t : "(없음)"));
+    if (want.book) log(r.chapters[0].book === want.book, "책 = " + r.chapters[0].book + " (기대 " + want.book + ")");
+    if (want.ch) log(r.chapters[0].ch === want.ch, "장 = " + r.chapters[0].ch);
+    if (want.dropped != null) log(r.dropped.length === want.dropped, "버린 줄 = " + r.dropped.length + " (기대 " + want.dropped + ")");
+    if (want.warn === 0) log(r.warnings.length === 0, "경고 없음 (" + r.warnings.join(" / ") + ")");
+    log(r.confidence >= (want.minConf || 0.6), "신뢰도 = " + r.confidence.toFixed(2));
+    if (fail) show(vs.map(function (v) { return v.n + " | " + v.t; }).join("\n"));
+  }
+
+  // ── 1. 줄머리 절 번호 — 가장 흔한 형태
+  check("1. 줄머리 절 번호", [
+    "1 처음에 말씀이 있었느니라",
+    "2 그 말씀이 빛 가운데 있더라",
+    "3 빛을 보시고 좋다 하시니라"
+  ].join("\n"), { strategy: "S1", count: 3, first: "처음에 말씀이 있었느니라", warn: 0 });
+
+  // ── 2. 장 제목·소제목이 섞인 형태
+  check("2. 장 제목과 소제목 섞임", [
+    "창세기 1장",
+    "빛을 만드신 일",
+    "1 처음에 말씀이 있었느니라",
+    "2 그 말씀이 빛 가운데 있더라",
+    "물을 나누신 일",
+    "3 빛을 보시고 좋다 하시니라",
+    "대한성서공회"
+  ].join("\n"), { strategy: "S1", count: 3, book: "GEN", ch: 1, dropped: 4, first: "처음에 말씀이 있었느니라" });
+
+  // ── 3. 화면 폭에서 잘려 여러 줄로 복사된 경우
+  check("3. 긴 절이 여러 줄로 잘림", [
+    "1 처음에 말씀이 있었고 그 말씀이 빛 가운데",
+    "있어 어둠을 이기었느니라",
+    "2 무리가 그것을 보고 심히 기뻐하더라"
+  ].join("\n"), {
+    strategy: "S1", count: 2,
+    first: "처음에 말씀이 있었고 그 말씀이 빛 가운데 있어 어둠을 이기었느니라", warn: 0
+  });
+
+  // ── 4. 번호 없이 줄바꿈만
+  check("4. 줄바꿈만 (번호 없음)", [
+    "처음에 말씀이 있었느니라",
+    "그 말씀이 빛 가운데 있더라",
+    "빛을 보시고 좋다 하시니라"
+  ].join("\n"), { strategy: "S3", count: 3, first: "처음에 말씀이 있었느니라", minConf: 0.5 });
+
+  // ── 5. 한 줄에 여러 절 — 본문 속 숫자에 속지 않아야 한다
+  check("5. 한 줄에 여러 절 + 본문 속 숫자",
+    "1 처음에 말씀이 있었느니라 2 그가 430년 동안 머물렀더라 3 무리가 12 지파로 나뉘니라",
+    { strategy: "S2", count: 3, last: "무리가 12 지파로 나뉘니라", minConf: 0.7 });
+
+  // ── 6. 장:절 표기 — 여러 장이 한꺼번에
+  section("6. 장:절 표기 (여러 장)");
+  var r6 = PS.parse([
+    "1:1 처음에 말씀이 있었느니라",
+    "1:2 그 말씀이 빛 가운데 있더라",
+    "2:1 이튿날 무리가 모이니라"
+  ].join("\n"), {});
+  log(r6.strategy === "S4", "쪼개기 방식 = " + r6.strategy);
+  log(r6.chapters.length === 2, "장 개수 = " + r6.chapters.length);
+  log(r6.chapters[0].verses.length === 2 && r6.chapters[1].verses.length === 1, "장별 절 개수 = " +
+    r6.chapters.map(function (c) { return c.ch + "장:" + c.verses.length; }).join(", "));
+
+  // ── 7. 표(탭) 복사
+  check("7. 탭 구분 (표 복사)", [
+    "창세기\t1\t1\t처음에 말씀이 있었느니라",
+    "창세기\t1\t2\t그 말씀이 빛 가운데 있더라"
+  ].join("\n"), { strategy: "S5", count: 2, ch: 1, first: "처음에 말씀이 있었느니라" });
+
+  // ── 8. 경고가 떠야 하는 경우
+  section("8. 이상한 입력에 경고가 뜨는가");
+  var r8 = PS.parse("1 처음에 말씀이 있었느니라\n3 빛을 보시고 좋다 하시니라", {});
+  log(r8.warnings.length > 0, "빠진 절 경고: " + r8.warnings.join(" / "));
+  var r9 = PS.parse("2 그 말씀이 빛 가운데 있더라\n3 빛을 보시고 좋다 하시니라", {});
+  log(/1절이 아니라/.test(r9.warnings.join(" ")), "1절부터가 아님 경고: " + r9.warnings.join(" / "));
+
+  // ── 9. 저장용 배열 변환
+  section("9. 저장용 배열");
+  var arr = PS.toVerseArray([{ n: 1, t: "가" }, { n: 3, t: "다" }]);
+  log(arr.length === 3 && arr[1] === "", "빠진 절은 빈 칸으로 메운다: " + JSON.stringify(arr));
+
+  // ── 10. 책 이름 찾기
+  section("10. 책 이름 찾기");
+  log(BK.byName("창세기").c === "GEN", "창세기");
+  log(BK.byName("창").c === "GEN", "창 (약어)");
+  log(BK.byName("요한 복음").c === "JHN", "요한 복음 (공백 무시)");
+  log(BK.byName("요일").c === "1JN", "요일 (요한일서)");
+  log(BK.byName("없는책") === null, "모르는 이름은 null");
+  log(BK.totalChapters() === 1189, "전체 장 수 = " + BK.totalChapters() + " (기대 1189)");
+
+  var sum = document.getElementById("summary");
+  sum.className = fail === 0 ? "ok" : "bad";
+  sum.textContent = fail === 0 ? ("전부 통과 — " + pass + "건") : (fail + "건 실패 / " + pass + "건 통과");
+})();
+</script>
+</body>
+</html>
