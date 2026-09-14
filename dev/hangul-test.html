@@ -141,9 +141,21 @@
   eq(s.stats().errorEvents, 1, "지나쳐 버린 자리만 오타 1회");
   s.update("바나", 2, 2);      // 그대로 유지 -> 더 세지 않는다
   eq(s.stats().errorEvents, 1, "머무는 동안 중복해서 세지 않는다");
+  eq(s.stats().wrong, 1, "지금 어긋난 글자 수");
   s.update("", 0, 0);
+  eq(s.stats().wrong, 0, "지우면 어긋난 글자 수는 0으로 돌아간다");
+  eq(s.stats().errorEvents, 1, "고쳐도 저지른 실수 기록은 남는다");
   s.update("바나", 2, 2);      // 지웠다 다시 같은 실수
   eq(s.stats().errorEvents, 2, "지웠다 다시 틀리면 다시 1회");
+
+  // 한 글자를 빠뜨리면 그 뒤가 전부 밀린다. 자리를 하나씩 맞대면 실수 하나가
+  // 오타 수십 번이 된다 — 실제로 "오타 62"가 이렇게 나왔다.
+  s = TY.createSession("태초에 말씀이 계시니라");
+  s.update("태초 말씀이 계시니라", 12, 12);   // '에'를 빠뜨렸다
+  eq(s.stats().errorEvents, 1, "한 글자를 빠뜨려도 실수는 1회 (뒤가 밀려도)");
+  s = TY.createSession("태초에 말씀이 계시니라");
+  s.update("태초에에 말씀이 계시니라", 14, 14); // '에'를 두 번 쳤다
+  eq(s.stats().errorEvents, 1, "한 글자를 더 쳐도 실수는 1회");
 
   s = TY.createSession("가나");
   s.update("ㄱ", 0, 1); s.update("가", 0, 1); s.update("간", 0, 1); s.update("가나", 1, 2);

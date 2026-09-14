@@ -26,7 +26,8 @@
     var tChars = target.chars;
 
     var prevStates = [];
-    var errorEvents = 0;
+    var errorEvents = 0;   // 이 절을 쓰는 동안 저지른 실수 — 기록에 남는 값
+    var distance = 0;      // 지금 이 순간 원문과 어긋난 정도 — 고치면 0으로 돌아간다
     var typedJamo = 0;
     var startedAt = 0, lastInputAt = 0, elapsed = 0;
 
@@ -74,21 +75,8 @@
       // 자리라 한 음절을 치는 동안에도 판정이 여러 번 뒤집힌다. 거기서 세면 정상적으로
       // 쳐도 오타가 수십 번 쌓인다. 사람 기준으로도 아직 치는 중인 글자는 오타가
       // 아니라 고쳐 쓰는 중이다. **지나쳐 버린 자리**만 오타로 본다.
-      var settled = tp.length - 1;
-
-      // 아직 치고 있는 자리는 "틀렸다"로 **기억해 두지도** 않는다. 기억해 두면
-      // 나중에 그 자리를 지나칠 때 "이미 틀려 있었다"가 되어 한 번도 세지 못한다.
-      var mark = states.slice();
-      for (i = settled < 0 ? 0 : settled; i < mark.length; i++) {
-        if (mark[i] === "err" || mark[i] === "extra") mark[i] = "pending";
-      }
-
-      for (i = 0; i < settled; i++) {
-        var was = prevStates[i];
-        var now = states[i];
-        if ((now === "err" || now === "extra") && was !== "err" && was !== "extra") errorEvents++;
-      }
-      prevStates = mark;
+      countMistakes(tp, ns);
+      prevStates = states;
       typedJamo = HG.jamoCount(typed.text);
 
       tick(tp.length > 0);
@@ -101,6 +89,45 @@
         composing: ne > ns
       };
     };
+
+    /**
+     * 실수 세기 — 자리를 하나씩 맞대어 세지 않는다.
+     *
+     * 자리 비교는 **한 글자만 빠뜨려도 그 뒤가 전부 밀린다**. 실수는 하나인데
+     * 오타는 수십 번으로 세어진다. 그래서 "지금까지 친 글과 원문 사이의 편집 거리"를
+     * 본다. 글자를 빠뜨렸든 더 쳤든 어긋난 정도는 1이다.
+     *
+     * 그 거리가 늘어난 만큼만 실수로 적립한다(줄어드는 건 고친 것이므로 빼지 않는다).
+     * 지금 치고 있는 마지막 글자는 빼고 잰다 — 거기는 조합이 들락거리는 자리다.
+     */
+    function countMistakes(tp, ns) {
+      var cut = Math.min(ns, Math.max(0, tp.length - 1));
+      var d = prefixDistance(tp.slice(0, cut), tChars);
+      if (d > distance) errorEvents += d - distance;
+      distance = d;
+    }
+
+    // a를 b의 '어떤 접두사'로 바꾸는 데 드는 최소 편집 횟수.
+    // 아직 덜 친 뒷부분이 오답으로 잡히지 않도록 접두사 중 최선을 고른다.
+    function prefixDistance(a, b) {
+      var m = a.length, n = b.length, i, j;
+      if (!m) return 0;
+      var prev = new Array(n + 1), cur = new Array(n + 1);
+      for (j = 0; j <= n; j++) prev[j] = j;
+      for (i = 1; i <= m; i++) {
+        cur[0] = i;
+        for (j = 1; j <= n; j++) {
+          var sub = prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1);
+          var del = prev[j] + 1;
+          var ins = cur[j - 1] + 1;
+          cur[j] = sub < del ? (sub < ins ? sub : ins) : (del < ins ? del : ins);
+        }
+        var t = prev; prev = cur; cur = t;
+      }
+      var best = prev[0];
+      for (j = 1; j <= n; j++) if (prev[j] < best) best = prev[j];
+      return best;
+    }
 
     // 정규화 인덱스의 판정 결과를 원본 글자 자리로 되돌린다.
     // 접혀서 사라진 글자(연속 공백의 두 번째 등)는 앞 글자의 상태를 물려받는다.
@@ -147,7 +174,8 @@
         typedJamo: counted,
         ms: elapsed,
         cpm: min > 0.0005 ? Math.round(counted / min) : 0,
-        errorEvents: errorEvents,
+        errorEvents: errorEvents,   // 이 절에서 저지른 실수 (누적)
+        wrong: distance,            // 지금 어긋나 있는 글자 수 (고치면 0)
         accuracy: counted > 0 ? Math.max(0, 1 - errorEvents / counted) : 1
       };
     };
@@ -155,6 +183,7 @@
     session.reset = function () {
       prevStates = [];
       errorEvents = 0;
+      distance = 0;
       typedJamo = 0;
       startedAt = 0; lastInputAt = 0; elapsed = 0;
     };

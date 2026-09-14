@@ -284,7 +284,9 @@
         var st = session.stats();
         var parts = [];
         if (st.cpm) parts.push(st.cpm + "타/분");
-        if (st.errorEvents) parts.push("오타 " + st.errorEvents);
+        // 쓰는 중에는 "지금 어긋나 있는 글자 수"만 보여준다. 고치면 사라진다.
+        // 여기에 누적 실수 횟수를 띄우면, 고쳤는데도 숫자가 남아 있어 답답하다.
+        if (st.wrong) parts.push("틀린 글자 " + st.wrong);
         $("liveStats").textContent = r.typedLength ? parts.join(" · ") : "";
       }
     },
