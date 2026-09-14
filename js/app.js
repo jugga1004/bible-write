@@ -37,7 +37,7 @@
     if (name === "today") renderToday();
     if (name === "index") renderBooks();
     if (name === "import") renderSources();
-    if (name === "write") setTimeout(function () { editor && editor.focus(); }, 60);
+    if (name === "write") enterWrite();
     window.scrollTo(0, 0);
   }
 
@@ -106,6 +106,27 @@
   var state = { book: null, ch: 0, v: 1, verses: [], version: "" };
   var editor = null;
   var draftTimer = null;
+
+  /**
+   * 필사 탭을 눌러서 들어온 경우. 어느 장을 펼지 아직 정해지지 않았으므로
+   * 이어서 쓸 자리를 찾아 연다. 그것마저 없으면(본문을 한 장도 안 가져왔다면)
+   * 빈 화면을 보여주는 대신 왜 비었는지와 무엇을 하면 되는지를 말해 준다.
+   */
+  function enterWrite() {
+    if (state.book) {
+      setWriteEmpty(false);
+      setTimeout(function () { editor && editor.focus(); }, 60);
+      return;
+    }
+    var next = MS.nextPosition();
+    if (next) { openChapter(next.book, next.ch, next.v); return; }
+    setWriteEmpty(true);
+  }
+
+  function setWriteEmpty(empty) {
+    $("writeEmpty").hidden = !empty;
+    $("writeBody").hidden = empty;
+  }
 
   function openChapter(code, ch, v) {
     return BX.getChapter(code, ch).then(function (rec) {

@@ -69,6 +69,14 @@
 
   <!-- ─────────────────────────────────────────────── 필사 -->
   <section id="view-write" class="view" hidden>
+    <div class="card" id="writeEmpty" hidden>
+      <h2>필사할 본문이 없습니다</h2>
+      <p>이 앱에는 성경 본문이 들어 있지 않습니다. 번역본은 저작권이 있어 함께 배포할 수 없기 때문입니다.
+        쓰시는 성경 앱이나 사이트에서 한 장을 복사해 붙여넣으면 그 장부터 바로 필사할 수 있습니다.</p>
+      <button type="button" class="btn btn--primary" data-goto="import">본문 가져오기</button>
+    </div>
+
+    <div id="writeBody">
     <div class="write__head">
       <div>
         <div class="write__where" id="writeWhere">—</div>
@@ -98,6 +106,7 @@
     </div>
 
     <p class="hint muted">틀린 글자는 빨갛게 표시됩니다. 한 절을 다 쓰면 저절로 다음 절로 넘어갑니다(설정에서 끌 수 있음).</p>
+    </div>
   </section>
 
   <!-- ─────────────────────────────────────────────── 목차 -->
