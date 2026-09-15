@@ -38,6 +38,7 @@
     // 위첨자 절 번호를 보통 숫자로. 일부 사이트가 이렇게 준다.
     s = s.replace(/[¹²³⁰⁴-⁹]/g, function (c) { return SUPER[c] || c; });
     s = NM.normalizeSource(s);
+    s = stripFootnotes(s);
     var lines = s.split("\n");
     var out = [];
     for (var i = 0; i < lines.length; i++) {
@@ -45,6 +46,20 @@
       if (t) out.push(t);
     }
     return out;
+  }
+
+  /**
+   * 각주 표시를 걷어낸다.
+   *
+   * 대한성서공회 읽기 페이지에서 복사하면 각주 번호가 본문에 붙어 온다.
+   *   "땅이 1)혼돈하고 공허하며 …"
+   * 그대로 두면 필사할 때 "1)"까지 쳐야 한다.
+   *
+   * 절 번호 표기("1) 태초에…")와 헷갈리지 않는 이유는 **띄어쓰기**다. 각주는
+   * 뒤 글자에 딱 붙어 있고, 절 번호는 반드시 한 칸 띄어져 있다. 붙어 있을 때만 지운다.
+   */
+  function stripFootnotes(s) {
+    return s.replace(/(^|[^0-9])([0-9]{1,2})\)(?=[가-힣])/g, "$1");
   }
 
   function isNoise(line) {
