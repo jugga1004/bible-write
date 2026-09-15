@@ -499,11 +499,19 @@
       .map(function (b) { return b.c; });
 
     // 이미 가진 책은 건너뛴다. 66권을 다시 받느라 기다릴 이유가 없다.
+    // 번역본을 바꾸려는 경우에만 덮어쓰기를 켠다.
+    var force = $("netOverwrite").checked;
     var have = ST.sources();
-    var todo = codes.filter(function (c) { return !have[c]; });
+    var todo = force ? codes : codes.filter(function (c) { return !have[c]; });
     if (!todo.length) {
-      toast(codes.length === 1 ? "이미 가지고 있는 책입니다." : "고르신 범위는 이미 다 받았습니다.");
+      toast(codes.length === 1
+        ? "이미 가지고 있는 책입니다. 다른 번역본으로 바꾸시려면 덮어쓰기를 켜세요."
+        : "고르신 범위는 이미 다 받았습니다. 번역본을 바꾸시려면 덮어쓰기를 켜세요.");
       return;
+    }
+    if (force) {
+      var dup = codes.filter(function (c) { return have[c]; });
+      if (dup.length && !confirm(dup.length + "권의 기존 본문을 덮어씁니다. 쓰신 원고는 그대로 남지만 본문이 바뀌면 이어서 쓸 때 글이 달라집니다. 계속할까요?")) return;
     }
 
     netStop = false;
@@ -514,7 +522,7 @@
       if (netStop) throw new Error("멈춤");
       $("netStatus").textContent = name + " 받는 중… (" + (i + 1) + " / " + total + ")";
       $("netBar").style.width = (i / total * 100) + "%";
-    }).then(function (r) {
+    }, force).then(function (r) {
       setNetBusy(false);
       $("netBar").style.width = "100%";
       var msg = r.done + "권을 받았습니다.";

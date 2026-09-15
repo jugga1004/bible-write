@@ -141,7 +141,7 @@
       <p class="muted">공개 성경 API에서 한 권씩 받아옵니다. 받은 본문은 <b>이 기기 안에만</b> 저장되고
         어디로도 전송되지 않습니다. 번역본의 권리는 각 권리자에게 있으니 개인적으로 읽는 용도로만 쓰세요.</p>
       <div class="grid2">
-        <label>출처
+        <label>번역본
           <select id="netSource"></select>
         </label>
         <label>범위
@@ -156,6 +156,9 @@
       <label id="netBookWrap">책
         <select id="netBook"></select>
       </label>
+      <label class="check"><input type="checkbox" id="netOverwrite"> 이미 있는 책도 다시 받기(덮어쓰기)</label>
+      <p class="muted">한 책에는 한 번역본만 담깁니다. 창세기를 영어로 받으면 그 책의 한글 본문은 덮어씁니다.
+        책마다 다르게 두는 건 됩니다 — 창세기는 한글, 시편은 영어처럼.</p>
       <div class="row">
         <button type="button" id="netFetch" class="btn btn--primary">받기</button>
         <button type="button" id="netStop" class="btn" hidden>멈추기</button>

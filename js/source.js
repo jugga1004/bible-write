@@ -108,40 +108,40 @@
   //
   // 주소를 바꿔 끼울 수 있게 목록으로 둔다. 한 곳이 닫혀도 앱이 멈추지 않는다.
 
+  // 한 책에는 한 번역본만 담긴다(창세기를 영어로 받으면 그 책의 한글 본문은
+  // 덮어쓴다). 책마다 다른 번역본을 두는 건 된다 — 시편은 영어, 창세기는 한글처럼.
+  function getbible(slug, label, version, lang) {
+    return {
+      id: "getbible-" + slug,
+      label: label,
+      version: version,
+      lang: lang,
+      url: function (nr) { return "https://api.getbible.net/v2/" + slug + "/" + nr + ".json"; },
+      parse: parseGetbible
+    };
+  }
+
+  function parseGetbible(data) {
+    var chapters = {};
+    (data.chapters || []).forEach(function (ch) {
+      var arr = [];
+      (ch.verses || []).forEach(function (v) {
+        arr[v.verse - 1] = NM.normalizeSource(v.text || "");
+      });
+      for (var i = 0; i < arr.length; i++) if (arr[i] == null) arr[i] = "";
+      chapters[ch.chapter] = arr;
+    });
+    return chapters;
+  }
+
   SRC.REMOTES = [
-    {
-      id: "getbible-korean",
-      label: "개역한글 · getbible.net",
-      version: "개역한글",
-      url: function (nr) { return "https://api.getbible.net/v2/korean/" + nr + ".json"; },
-      parse: function (data) {
-        var chapters = {};
-        (data.chapters || []).forEach(function (ch) {
-          var arr = [];
-          (ch.verses || []).forEach(function (v) {
-            arr[v.verse - 1] = NM.normalizeSource(v.text || "");
-          });
-          for (var i = 0; i < arr.length; i++) if (arr[i] == null) arr[i] = "";
-          chapters[ch.chapter] = arr;
-        });
-        return chapters;
-      }
-    },
-    {
-      id: "bolls-krv",
-      label: "개역한글 · bolls.life",
-      version: "개역한글",
-      url: function (nr) { return "https://bolls.life/get-text/KRV/" + nr + "/"; },
-      // bolls는 장 단위 주소라 한 권을 받으려면 장마다 불러야 한다. 여기서는
-      // 예비 출처로만 두고, 장 단위 보충에 쓴다.
-      chapterUrl: function (nr, ch) { return "https://bolls.life/get-text/KRV/" + nr + "/" + ch + "/"; },
-      parseChapter: function (rows) {
-        var arr = [];
-        (rows || []).forEach(function (v) { arr[v.verse - 1] = NM.normalizeSource(v.text || ""); });
-        for (var i = 0; i < arr.length; i++) if (arr[i] == null) arr[i] = "";
-        return arr;
-      }
-    }
+    getbible("korean", "개역한글 (한국어)", "개역한글", "ko"),
+    // 영어는 저작권이 만료된 판본들이라 출처 문제가 없다.
+    getbible("kjv", "King James Version (영어, 1611)", "KJV", "en"),
+    getbible("web", "World English Bible (영어, 현대어)", "WEB", "en"),
+    getbible("asv", "American Standard Version (영어, 1901)", "ASV", "en"),
+    getbible("basicenglish", "Basic English (영어, 쉬운 단어 850개)", "BBE", "en"),
+    getbible("ylt", "Young's Literal Translation (영어, 직역)", "YLT", "en")
   ];
 
   SRC.remote = function (id) {
